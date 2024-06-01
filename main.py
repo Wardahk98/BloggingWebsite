@@ -1,5 +1,5 @@
 from datetime import date
-from flask import Flask, abort, render_template, redirect, url_for, flash
+from flask import Flask, abort, render_template, redirect, url_for, flash, request
 from flask_bootstrap import Bootstrap5
 from flask_ckeditor import CKEditor
 from flask_gravatar import Gravatar
@@ -12,6 +12,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 # Import your forms from the forms.py
 from forms import CreatePostForm, RegisterUser, Login, Comment
 from typing import List
+import os
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = '8BYkEfBA6O6donzWlSihBXox7C0sKR6b'
@@ -89,6 +90,15 @@ class CommentData(db.Model):
     # ----------------------- BlogPost Child ----------------------------
     post_comment_id: Mapped[int] = mapped_column(Integer, ForeignKey("blog_posts.id"))
     post_comment: Mapped["BlogPost"] = relationship(back_populates="comment_parent")
+
+
+class ContactForm(db.Model):
+    __tablename__ = "contact-form"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    email: Mapped[str] = mapped_column(String, nullable=False)
+    phone: Mapped[int] = mapped_column(Integer)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
 
 
 with app.app_context():
@@ -306,8 +316,22 @@ def about():
     return render_template("about.html", logged_out=current_user.is_authenticated)
 
 
-@app.route("/contact")
+@app.route("/contact", methods=["POST", "GET"])
 def contact():
+    if request.method == "POST":
+        name = request.form.get("name")
+        email = request.form.get("email")
+        phone = request.form.get("phone")
+        msg = request.form.get("message")
+        contact_form = ContactForm(
+            name=name,
+            email=email,
+            phone=phone,
+            message=msg,
+        )
+        db.session.add(contact_form)
+        db.session.commit()
+        flash("Your message is delivered. We will get to you soon.")
     return render_template("contact.html", logged_out=current_user.is_authenticated)
 
 

@@ -9,13 +9,16 @@ from sqlalchemy.orm import relationship, DeclarativeBase, Mapped, mapped_column
 from sqlalchemy import Integer, String, Text, ForeignKey
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
-# Import your forms from the forms.py
+# Import forms from the forms.py
 from forms import CreatePostForm, RegisterUser, Login, Comment
 from typing import List
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = '8BYkEfBA6O6donzWlSihBXox7C0sKR6b'
+app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 ckeditor = CKEditor(app)
 Bootstrap5(app)
 
@@ -44,7 +47,7 @@ class Base(DeclarativeBase):
     pass
 
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///posts.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("DB_URI")
 db = SQLAlchemy(model_class=Base)
 db.init_app(app)
 
@@ -113,10 +116,8 @@ def register():
         email = reg_form.email.data
         password = reg_form.password.data
         name = reg_form.name.data
-        print(f"{email} - {password} - {name}")
         hashed_password = generate_password_hash(password=password, method="pbkdf2", salt_length=8)
-        print(hashed_password)
-        print(f"the password checker: {check_password_hash(hashed_password, password)}")
+
         with app.app_context():
             data = db.session.execute(db.select(User).where(User.email == email)).scalar()
             if data is None:
@@ -128,7 +129,6 @@ def register():
                 db.session.add(new_user)
                 db.session.commit()
                 login_user(new_user)
-                print(current_user.is_authenticated)
                 return redirect(url_for("get_all_posts"))
             else:
                 flash("User already registered")
@@ -144,7 +144,6 @@ def login():
     if login_form.validate_on_submit():
         log_email = login_form.email.data
         log_password = login_form.password.data
-        print(f"{log_email} - {log_password}")
         with app.app_context():
             data = db.session.execute(db.select(User).where(User.email == log_email)).scalar()
             if data is None:
@@ -155,10 +154,6 @@ def login():
                 return redirect(url_for("login"))
             else:
                 login_user(data)
-                # print(data.email)
-                # print(check_password_hash(data.password, log_password))
-                print(f"authentiated:{current_user.is_authenticated}")
-
                 return redirect(url_for("get_all_posts"))
     return render_template("login.html", form=login_form, logged_out=current_user.is_authenticated)
 
@@ -174,12 +169,7 @@ def logout():
 def get_all_posts():
     result = db.session.execute(db.select(BlogPost))
     posts = result.scalars().all()
-    # author_id = [x.author_id for x in posts]
-    # author = []
-    # for x in author_id:
-    #     author_data = db.session.execute(db.select(User).where(User.id == x)).scalar()
-    #     author.append(author_data.name)
-    #     print(author)
+
     post = []
     for x in posts:
         a = {"id": x.id,
@@ -188,14 +178,11 @@ def get_all_posts():
              "author": db.get_or_404(User, x.author_id).name,
              "date": x.date}
         post.append(a)
-        print(post)
-    # print(f"The post author id :{posts[0].author_id}")
+
     if current_user.is_authenticated:
         u_id = True
-        print(f"home u_id: {u_id}-{current_user}")
     else:
         u_id = False
-        print(f"home u_id: {u_id}-{current_user}")
     return render_template("index.html", all_posts=post, u_id=u_id,
                            logged_out=current_user.is_authenticated)
 
@@ -204,7 +191,6 @@ def get_all_posts():
 @app.route("/post/<int:post_id>", methods=["GET", "POST"])
 def show_post(post_id):
     requested_post = db.get_or_404(BlogPost, post_id)
-    print(requested_post)
     author = db.get_or_404(User, requested_post.author_id).name
     comment_form = 0
     if current_user.is_authenticated:
@@ -212,8 +198,7 @@ def show_post(post_id):
         if comment_form.validate_on_submit():
             clean_text = comment_form.comment.raw_data[0].replace("<p>", "")
             clean_text2 = clean_text.replace("</p>\r\n", "")
-            print(comment_form.comment.data)
-            print(clean_text2)
+
             comment_data = CommentData(
                 text=clean_text2,
                 author_id=current_user.id,
@@ -221,26 +206,23 @@ def show_post(post_id):
             )
             db.session.add(comment_data)
             db.session.commit()
-            print("Comment added")
         if current_user.id == 1 or author == current_user.name:
             u_id = True
-            print(f"show post u_id: {u_id}- {current_user}")
+
         else:
             u_id = False
-            print(f"show post u_id: {u_id}- {current_user}")
     else:
         u_id = False
     comment_data = []
     with app.app_context():
         data = db.session.execute(db.select(CommentData).where(CommentData.post_comment_id == post_id)).scalars()
         for x in data:
-            print(x.author_id)
-            # comments_author.append(db.get_or_404(User, x.author_id).name)
+
             a = {"author": db.get_or_404(User, x.author_id).name,
                  "comment": x.text,
                  "email": db.get_or_404(User, x.author_id).email}
             comment_data.append(a)
-            print(comment_data)
+
     gravatar = Gravatar(app,
                         size=100,
                         rating='g',

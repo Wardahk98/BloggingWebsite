@@ -180,7 +180,7 @@ def get_all_posts():
         post.append(a)
         print(post)
     # print(f"The post author id :{posts[0].author_id}")
-    if current_user.is_authenticated and current_user.id == 1:
+    if current_user.is_authenticated:
         u_id = True
         print(f"home u_id: {u_id}-{current_user}")
     else:
@@ -212,7 +212,7 @@ def show_post(post_id):
             db.session.add(comment_data)
             db.session.commit()
             print("Comment added")
-        if current_user.id == 1:
+        if current_user.id == 1 or author == current_user.name:
             u_id = True
             print(f"show post u_id: {u_id}- {current_user}")
         else:
